@@ -4,6 +4,10 @@
   "description": "Identity-based enums for TypeScript: members are unique symbols, so comparing members across different enums is always safe",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LakeVostok/enumbra.git"
+  },
   "main": "./dist/Enum.js",
   "types": "./dist/Enum.d.ts",
   "exports": {
