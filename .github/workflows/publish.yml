@@ -110,9 +110,9 @@ jobs:
       - name: Publish to npm
         run: |
           if [ "${{ inputs.version_type }}" = "beta" ]; then
-            npm publish --provenance --tag beta
+            npm publish --provenance --access public --tag beta
           else
-            npm publish --provenance --tag latest
+            npm publish --provenance --access public --tag latest
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
