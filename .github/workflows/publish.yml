@@ -1,0 +1,118 @@
+name: Publish to npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - beta
+        default: patch
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: publish-npm
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stable releases only from main or master
+        run: |
+          if [ "${{ inputs.version_type }}" != "beta" ] && [ "${{ github.ref_name }}" != "main" ] && [ "${{ github.ref_name }}" != "master" ]; then
+            echo "::error::Stable releases (${{ inputs.version_type }}) must be published from 'main' or 'master', not '${{ github.ref_name }}'. Use 'beta' for prereleases from other branches."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+
+      - run: npm run check
+
+      - name: Bump version
+        run: |
+          if [ "${{ inputs.version_type }}" = "beta" ]; then
+            SLUG=$(printf '%s' "${{ github.ref_name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g; s/-\+/-/g; s/^-//; s/-$//' | cut -c1-20)
+            [ -n "$SLUG" ] || SLUG=branch
+            npm version prerelease --preid="beta-${SLUG}" --no-git-tag-version
+          else
+            npm version "${{ inputs.version_type }}" --no-git-tag-version
+          fi
+
+      - run: npm run build
+
+      - name: Commit and push version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+          if [ "${{ inputs.version_type }}" = "beta" ]; then
+            git commit -m "chore: release v${VERSION}"
+            git push origin "HEAD:${{ github.ref_name }}"
+            git tag "v${VERSION}"
+            git push origin "refs/tags/v${VERSION}"
+          else
+            git checkout -b "release/v${VERSION}"
+            git commit -m "chore: release v${VERSION}"
+            git push origin "release/v${VERSION}"
+          fi
+
+      - name: Merge release PR once checks pass
+        if: inputs.version_type != 'beta'
+        env:
+          # PAT rather than GITHUB_TOKEN: events created with the default token
+          # don't trigger workflows, so a bot-opened PR would never run check
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          gh pr create --base "${{ github.ref_name }}" --head "release/v${VERSION}" \
+            --title "chore: release v${VERSION}" \
+            --body "Automated release PR. Merges once the Check workflow passes, then tags and publishes to npm."
+
+          # the check suite registers a few seconds after PR creation; asking
+          # earlier makes gh pr checks fail with "no checks reported"
+          for i in $(seq 1 60); do
+            if gh pr checks 2>/dev/null; then
+              break
+            fi
+            sleep 5
+          done
+          gh pr checks --watch
+          gh pr merge --rebase --delete-branch
+
+      - name: Tag the merged commit
+        if: inputs.version_type != 'beta'
+        run: |
+          git fetch origin "${{ github.ref_name }}"
+          git switch --detach FETCH_HEAD
+          git tag "v${VERSION}"
+          git push origin "refs/tags/v${VERSION}"
+
+      - name: Publish to npm
+        run: |
+          if [ "${{ inputs.version_type }}" = "beta" ]; then
+            npm publish --provenance --tag beta
+          else
+            npm publish --provenance --tag latest
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

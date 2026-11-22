@@ -1,0 +1,57 @@
+name: Deprecate npm version
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to deprecate — the 'List published versions' step output shows all of them"
+        required: true
+        type: string
+      confirm_stable:
+        description: "Required when deprecating a stable (non-prerelease) version"
+        required: false
+        type: boolean
+        default: false
+      message:
+        description: "Warning shown when the version is installed"
+        required: false
+        type: string
+        default: "This version is deprecated; install enumbra@latest instead."
+
+permissions:
+  contents: read
+
+jobs:
+  deprecate:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Configure npm authentication
+        run: echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > "$HOME/.npmrc"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: List published versions
+        run: npm view enumbra versions
+
+      - name: Validate version
+        run: |
+          VERSION="${{ inputs.version }}"
+          if ! printf '%s' "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-'; then
+            if [ "${{ inputs.confirm_stable }}" != "true" ]; then
+              echo "::error::Refusing to deprecate stable version '$VERSION' — re-run with 'confirm stable deprecation' checked."
+              exit 1
+            fi
+            echo "Deprecating a stable version (confirmed via checkbox)."
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Check the version exists on npm
+        run: npm view "enumbra@${VERSION}" version
+
+      - name: Deprecate
+        run: npm deprecate "enumbra@${VERSION}" "${{ inputs.message }}"

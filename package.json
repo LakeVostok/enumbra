@@ -1,0 +1,49 @@
+{
+  "name": "enumbra",
+  "version": "0.1.0",
+  "description": "Identity-based enums for TypeScript: members are unique symbols, so comparing members across different enums is always safe",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/Enum.js",
+  "types": "./dist/Enum.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/Enum.d.ts",
+      "default": "./dist/Enum.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "keywords": [
+    "enum",
+    "enums",
+    "typescript",
+    "identity",
+    "symbol"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "tsc": "tsc --noEmit",
+    "check": "npm run tsc && npm t && npm run lint",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run check",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^6.0.1",
+    "eslint": "^10.15.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.73.0",
+    "vitest": "^5.1.1"
+  }
+}
