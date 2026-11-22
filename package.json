@@ -1,6 +1,6 @@
 {
   "name": "enumbra",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Identity-based enums for TypeScript: members are unique symbols, so comparing members across different enums is always safe",
   "type": "module",
   "license": "MIT",
